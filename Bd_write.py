@@ -27,65 +27,59 @@ def create_one_rfid(list_from_message):
 
 
 def create_rfidsnums(ch, method, properties, body):
-    """Принимает значения из RabbitMQ и записывает в БД"""
+    """Принимает значение RFID uid из RabbitMQ и записывает в БД"""
     print(" [x] Received %r" % body)
-
+    error_2 = "Не получен ключ операции"
+    error_1 = "Заказ с таким номером уже существует!"
     one_rfid = json.loads(body)
-    if one_rfid['key'] == 'EditStatus':
-        users.find_one_and_update({'order': one_rfid['order']}, {'$set': {'status': one_rfid['status']}})
+    try:
+        if one_rfid['key'] == 'EditStatus':
+            users.find_one_and_update({'order': one_rfid['order']}, {'$set': {'status': one_rfid['status']}})
 
-    elif one_rfid['key'] == 'MakeNew':
-        del one_rfid['key']
-        print(one_rfid)
-        if users.find_one({'order': one_rfid['order']}) is None:
-            users.insert_one(one_rfid)
-        else:
-            print("Заказ с таким номером уже существует!")
-    else:
-        print("Не получен ключ операции")
-
-    '''
-    if users.find_one({"order": list_from_message[2]}) is None:
-        users.insert_one(one_rfid)
-        print("Запись успешно проведена: ")
-        print(users.find_one({'order': list_from_message[2]}))
-    else:
-        print("Такой заказ уже существует")
-        
-       
+        elif one_rfid['key'] == 'MakeNew':
+            del one_rfid['key']
+            print(one_rfid)
+            if users.find_one({'order': one_rfid['order']}) is None:
+                users.insert_one(one_rfid)
+            else:
+                print(error_1)
+                channel.basic_publish(
+                    exchange='',
+                    routing_key='cashboxerrors',
+                    body=error_1,
+                    properties=pika.BasicProperties(
+                        delivery_mode=2,
+                    ))
+    except IndexError:
+        print(error_2)
         channel.basic_publish(
             exchange='',
             routing_key='cashboxerrors',
-            body=str("Такой заказ уже существет"),
+            body=error_2,
             properties=pika.BasicProperties(
                 delivery_mode=2,
             ))
-            '''
+
 
 def add_tables(ch, method, properties, body):
-    """Принимает значения из RabbitMQ и записывает в БД"""
+    """Принимает значение номера стола(table) из RabbitMQ и записывает в БД"""
     print(" [x] Received %r" % body)
+    error_1 = "Данный номер метки не найден"
     list_from_message_tables = prepare_list(body)
     if users.find_one({'order': list_from_message_tables[0]}) is None:
-        print("Данный номер метки не найден")
+        print(error_1)
+        channel.basic_publish(
+            exchange='',
+            routing_key='tableserrors',
+            body=error_1,
+            properties=pika.BasicProperties(
+                delivery_mode=2,
+            ))
     else:
         users.find_one_and_update({'order': list_from_message_tables[0]},
                                   {'$set': {'table': list_from_message_tables[1]}})
         print("Запись стола успешно обновлена:")
         print(users.find_one({'order': list_from_message_tables[0]}))
-
-
-
-'''
-    # Если приходит в виде словаря
-    new_rfid ={}
-    new_rfid = body
-    if rfids.find_one({"RFID": new_rfid['rfid']}) is None:
-        rfids.insert_one(new_rfid)
-    else:
-        rfids.find_one_and_update({"RFID" : new_rfid['rfid']}, {'$set': {'num': new_rfid['order']}})
-
-'''
 
 
 credentials = pika.PlainCredentials('guest', 'guest')
@@ -95,6 +89,7 @@ connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.13',
                                                                credentials))
 channel = connection.channel()
 channel.queue_declare(queue='cashboxerrors', durable=True)
+channel.queue_declare(queue='tableserrors', durable=True)
 channel.queue_declare(queue='bdmodule', durable=True)
 channel.queue_declare(queue='bdtables', durable=True)
 mongo_client = MongoClient()
