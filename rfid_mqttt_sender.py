@@ -3,7 +3,7 @@ import pika
 import time
 
 credentials = pika.PlainCredentials('guest', 'guest')
-connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.1.100',
+connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.1.13',
                                                                5672,
                                                                '/',
                                                                credentials=credentials,
@@ -14,8 +14,6 @@ connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.1.100',
                                                                ))
 channel = connection.channel()
 channel.queue_declare(queue='rfidnums', durable=True)
-
-
 properties = pika.BasicProperties(content_type='text/plain', delivery_mode=1)
 
 
@@ -58,7 +56,7 @@ def on_message(client, userdata ,  message):
     print("message retain flag=", message.retain)
 
 
-hostIP = "192.168.1.100"
+hostIP = "192.168.1.13"
 client = mqtt.Client('P1', clean_session=True)
 # client.username_pw_set("mqtt-test", "mqtt-test")
 client.connect(hostIP)

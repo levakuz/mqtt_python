@@ -1,6 +1,7 @@
 from pymongo import MongoClient
 import pika
 import json
+import time
 
 
 def prepare_list(body):
@@ -18,15 +19,52 @@ def create_rfidsnums(ch, method, properties, body):
     error_2 = "Не получен ключ операции"
     error_1 = "Заказ с таким номером уже существует!"
     one_rfid = json.loads(body)
+    print(one_rfid)
 
     try:
         if one_rfid['key'] == 'EditStatus':
-            users.find_one_and_update({'order': one_rfid['order']} and {'table': {'$ne': None}}, {'$set': {'status': one_rfid['status']}})
+            print(one_rfid['order'])
+            print(users.find_one_and_update({'$and': [{'order': one_rfid['order']}, {'table': {'$exists': True}}]},
+                                                    {'$set': {'status': one_rfid['status']}}))
+            for bd in users.find({}, projection={'_id': False, 'cashbox': False, 'rfid': False}):
+                print(bd)
+                channel.basic_publish(
+                    exchange='',
+                    routing_key='orders',
+                    body=json.dumps(bd),
+                    properties=pika.BasicProperties(
+                        delivery_mode=2,
+                    ))
+            message = json.dumps('end')
+            channel.basic_publish(
+                exchange='',
+                routing_key='orders',
+                body=message,
+                properties=pika.BasicProperties(
+                    delivery_mode=2,
+                ))
         elif one_rfid['key'] == 'MakeNew':
             del one_rfid['key']
             print(one_rfid)
             if users.find_one({'order': one_rfid['order'], 'status': {'$ne': 4}}) is None:
                 users.insert_one(one_rfid)
+                for bd in users.find({}, projection={'_id': False, 'cashbox': False, 'rfid': False}):
+                    print(bd)
+                    channel.basic_publish(
+                        exchange='',
+                        routing_key='orders',
+                        body=json.dumps(bd),
+                        properties=pika.BasicProperties(
+                            delivery_mode=2,
+                        ))
+                message = json.dumps('end')
+                channel.basic_publish(
+                    exchange='',
+                    routing_key='orders',
+                    body=message,
+                    properties=pika.BasicProperties(
+                        delivery_mode=2,
+                    ))
             else:
                 print(error_1)
                 channel.basic_publish(
@@ -52,7 +90,8 @@ def add_tables(ch, method, properties, body):
     print(" [x] Received %r" % body)
     error_1 = "Данный номер метки не найден"
     list_from_message_tables = prepare_list(body)
-    for num in numbers.find_one({'rfid': list_from_message_tables[0]}):
+    print(list_from_message_tables[0])
+    for num in numbers.find({'rfid': str(list_from_message_tables[0])}):
         print(num)
     if num is None:
         print(error_1)
@@ -64,16 +103,36 @@ def add_tables(ch, method, properties, body):
                 delivery_mode=2,
             ))
     else:
-        users.find_one_and_update({'status': {'$ne': '4'}} and {'number': num},
+        if users.find_one({'$and': [{'status': {'$ne': '4'}},{'rfid': num['number']}]}) is None:
+            print("Ошибка! Нет действующих заказов с такой меткой")
+        else:
+            users.find_one_and_update({'$and': [{'status': {'$ne': '4'}},{'rfid': num['number']}]},
                                   {'$set': {'table': list_from_message_tables[1]}})
-        print("Запись стола успешно обновлена:")
-        print(users.find_one({'order': list_from_message_tables[0]}))
+            print("Запись стола успешно обновлена:")
+            print(users.find_one({'order': list_from_message_tables[0]}))
+            for bd in users.find({}, projection={'_id': False, 'cashbox': False, 'rfid': False}):
+                print(bd)
+                channel.basic_publish(
+                    exchange='',
+                    routing_key='orders',
+                    body=json.dumps(bd),
+                    properties=pika.BasicProperties(
+                        delivery_mode=2,
+                    ))
+            message = json.dumps('end')
+            channel.basic_publish(
+                exchange='',
+                routing_key='orders',
+                body=message,
+                properties=pika.BasicProperties(
+                    delivery_mode=2,
+                ))
 
 
 def check_robot(ch, method, properties, body):
     """Проверка значения метки, полученной роботом """
     print(" [x] Received %r" % body)
-    if users.find_one({'status': {"$ne": '4'}} and {'rfid': str(body.decode("utf-8"))},
+    if users.find_one({'$and': [{'status': {"$ne": '4'}}, {'rfid': str(body.decode("utf-8"))}]},
                       projection={'_id': False, 'cashbox': False, 'order': False}) is None:
         channel.basic_publish(
             exchange='',
@@ -90,13 +149,30 @@ def check_robot(ch, method, properties, body):
             properties=pika.BasicProperties(
                 delivery_mode=2,
             ))
-        users.find_one_and_update({'status': '3'} and {'rfid': str(body.decode("utf-8"))},
+        users.find_one_and_update({'$and': [{'status': '3'}, {'rfid': str(body.decode("utf-8"))}]},
                                   {'$set': {'status': '4'}},
                                   projection={'_id': False, 'cashbox': False, 'order': False})
+        for bd in users.find({}, projection={'_id': False, 'cashbox': False, 'rfid': False}):
+            print(bd)
+            channel.basic_publish(
+                exchange='',
+                routing_key='orders',
+                body=json.dumps(bd),
+                properties=pika.BasicProperties(
+                    delivery_mode=2,
+                ))
+        message = json.dumps('end')
+        channel.basic_publish(
+            exchange='',
+            routing_key='orders',
+            body=message,
+            properties=pika.BasicProperties(
+                delivery_mode=2,
+            ))
 
 
 def send_bd(ch, method, properties, body):
-    """Отправляет по запросу БД, исключая выполненные заказы"""
+    """Отправляет по запросу БД"""
     print(" [x] Received %r" % body)
     for bd in users.find({}, projection={'_id': False,  'cashbox': False, 'rfid': False}):
         print(bd)
@@ -120,8 +196,9 @@ def send_bd(ch, method, properties, body):
 def get_nums(ch, method, properties, body):
     """Выполняет пересыл информации номера метки в форму на кассу"""
     print(" [x] Received %r" % body)
-    for num in numbers.find({'rfid': str(body.decode("utf-8"))}, projection={'_id': False,  'cashbox': False, 'rfid': False}):
-        print(num['number'])
+    for num in numbers.find({'rfid': str(body.decode("utf-8"))},
+                            projection={'_id': False,  'cashbox': False, 'rfid': False}):
+        print(str(num['number']))
     channel.basic_publish(
         exchange='',
         routing_key='rfid',
@@ -131,8 +208,8 @@ def get_nums(ch, method, properties, body):
         ))
 
 
-credentials = pika.PlainCredentials('guest', 'guest')
-connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.1.100',
+credentials = pika.PlainCredentials('test', 'test')
+connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.1.97',
                                                                5672,
                                                                '/',
                                                                credentials))
@@ -144,6 +221,8 @@ channel.queue_declare(queue='bdtables', durable=True)
 channel.queue_declare(queue='bdrobots', durable=True)
 channel.queue_declare(queue='robots', durable=True)
 channel.queue_declare(queue='rfidnums', durable=True)
+channel.queue_declare(queue='GetOrders', durable=True)
+channel.queue_declare(queue='orders', durable=True)
 mongo_client = MongoClient()
 db = mongo_client.new_database
 users = db.users
