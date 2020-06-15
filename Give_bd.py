@@ -13,8 +13,7 @@ channel = connection.channel()
 def send_bd(ch, method, properties, body):
     """Отправляет по запросу БД"""
     print(" [x] Received %r" % body)
-    for bd in users.find({}, projection={'_id': False,  'cashbox': False, 'rfid': False}):
-
+    for bd in users.find({'status': {'$ne': 4}}, projection={'_id': False,  'cashbox': False, 'rfid': False}):
         print(bd)
         channel.basic_publish(
             exchange='',
@@ -33,8 +32,6 @@ def send_bd(ch, method, properties, body):
         ))
 
 
-
-channel = connection.channel()
 channel.queue_declare(queue='orders', durable=True)
 channel.queue_declare(queue='GetOrders', durable=True)
 mongo_client = MongoClient()
