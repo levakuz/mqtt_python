@@ -1,8 +1,7 @@
 from pymongo import MongoClient
 import pika
 import json
-import datetime
-from memory_profiler import memory_usage
+
 
 def refresh_bd_users(routing_key):
     for bd in users.find({}, projection={'_id': False, 'cashbox': False, 'rfid': False}):
@@ -110,7 +109,6 @@ def create_rfidsnums(ch, method, properties, body):
 
 def add_tables(ch, method, properties, body):
     """Принимает значение номера стола(table) из RabbitMQ и записывает в БД"""
-    print(datetime.datetime.now())
     print(" [x] Received %r" % body)
     error_1 = "Данный номер метки не найден"
     list_from_message_tables = prepare_list(body)
@@ -126,7 +124,7 @@ def add_tables(ch, method, properties, body):
         else:
             print(list_from_message_tables)
             users.update_one({'$and': [{'status': {'$ne': '4'}}, {'rfid': num['number']}]},
-                             {'$set': {'table': list_from_message_tables[1], 'time': str(datetime.datetime.now())}})
+                             {'$set': {'table': list_from_message_tables[1]}})
             print("Запись стола успешно обновлена:")
             print(users.find_one({'order': list_from_message_tables[0]}))
             refresh_bd_users('orders')
@@ -134,13 +132,11 @@ def add_tables(ch, method, properties, body):
 
 def check_robot(ch, method, properties, body):
     """Проверка значения метки, полученной роботом """
-    print(datetime.datetime.now())
     print(" [x] Received %r" % body)
     for num in numbers.find({'rfid': str(body.decode("utf-8"))}):
         print(num['number'])
     if users.find_one({'$and': [{'status': {"$ne": '4'}}, {'rfid': num['number']}]},
                       projection={'_id': False, 'cashbox': False, 'order': False}) is None:
-        print(datetime.datetime.now())
         channel.basic_publish(
             exchange='',
             routing_key='ROSINFO',
@@ -178,8 +174,8 @@ def get_bd_request(ch, method, properties, body):
 
 
 
-credentials = pika.PlainCredentials('lev', 'lev')
-connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.1.98',
+credentials = pika.PlainCredentials('admin', 'admin')
+connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.17',
                                                                5672,
                                                                '/',
                                                                credentials))
@@ -194,7 +190,7 @@ channel.queue_declare(queue='rfidnums', durable=True)
 channel.queue_declare(queue='GetOrders', durable=True)
 channel.queue_declare(queue='orders', durable=True)
 channel.queue_declare(queue='ROSINFO', durable=False)
-mongo_client = MongoClient('192.168.1.98', 2717)
+mongo_client = MongoClient('192.168.0.17', 2717)
 db = mongo_client.new_database
 users = db.users
 numbers = db.numbers
@@ -210,7 +206,6 @@ channel.basic_consume(
 channel.basic_consume(
     queue='rfidnums', on_message_callback=get_nums, auto_ack=True)
 print(' [*] Waiting for messages. To exit press CTRL+C')
-print(memory_usage())
 channel.start_consuming()
 
 

@@ -1,10 +1,9 @@
 import paho.mqtt.client as mqtt
 import pika
-import datetime
-from memory_profiler import memory_usage
 
-credentials = pika.PlainCredentials('lev', 'lev')
-connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.1.98',
+
+credentials = pika.PlainCredentials('admin', 'admin')
+connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.17',
                                                                5672,
                                                                '/',
                                                                credentials=credentials,
@@ -39,7 +38,6 @@ def on_message(client, userdata ,  message):
         print("message received ", str(message.payload.decode("utf-8")))
         send_to_rabbit(str(message.payload.decode("utf-8")))
     elif message.topic == "tables/":
-        print(datetime.datetime.now())
         new_message = str(message.payload.decode("utf-8"))
         print("message received ", new_message)
 
@@ -49,7 +47,6 @@ def on_message(client, userdata ,  message):
              body=new_message
              )
     elif message.topic == "robots/":
-        print(datetime.datetime.now())
         new_message = str(message.payload.decode("utf-8"))
         print("message received ", new_message)
         channel.basic_publish(
@@ -62,15 +59,13 @@ def on_message(client, userdata ,  message):
     print("message retain flag=", message.retain)
 
 
-hostIP = "192.168.1.105"
+hostIP = "192.168.0.17"
 client = mqtt.Client('P1', clean_session=True)
-#client.username_pw_set("lev", "lev")
 client.connect(hostIP)
 client.on_message = on_message
 client.subscribe("rfids/")
 client.subscribe("tables/")
 client.subscribe("robots/")
-print(memory_usage())
 client.loop_forever()
 
 
