@@ -162,16 +162,20 @@ def get_nums(ch, method, properties, body):
     print(" [x] Received %r" % body)
     for num in numbers.find({'rfid': str(body.decode("utf-8"))},
                             projection={'_id': False}):
-        send_bd("rfid", json.dumps(num))
+        print(num)
+        channel.basic_publish(
+            exchange='',
+            routing_key='rfid',
+            body=json.dumps(num),
+            properties=pika.BasicProperties(
+                delivery_mode=2,
+            ))
 
 
 def get_bd_request(ch, method, properties, body):
     """Прием запроса на отправку БД"""
     print(" [x] Received %r" % body)
     refresh_bd_users('orders')
-
-
-
 
 
 credentials = pika.PlainCredentials('admin', 'admin')

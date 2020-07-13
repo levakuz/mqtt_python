@@ -36,7 +36,7 @@ def send_to_rabbit(message, queue):
 def on_message(client, userdata ,  message):
     if message.topic == "rfids/":
         print("message received ", str(message.payload.decode("utf-8")))
-        send_to_rabbit(str(message.payload.decode("utf-8")))
+        send_to_rabbit(str(message.payload.decode("utf-8")),'rfidnums')
     elif message.topic == "tables/":
         new_message = str(message.payload.decode("utf-8"))
         print("message received ", new_message)
@@ -59,7 +59,7 @@ def on_message(client, userdata ,  message):
     print("message retain flag=", message.retain)
 
 
-hostIP = "192.168.0.17"
+hostIP = "192.168.1.106"
 client = mqtt.Client('P1', clean_session=True)
 client.connect(hostIP)
 client.on_message = on_message
