@@ -92,6 +92,7 @@ def create_rfidsnums(ch, method, properties, body):
         elif one_rfid['key'] == 'MakeNew':
             del one_rfid['key']
             print(one_rfid)
+
             if users.find_one({'order': one_rfid['order'], 'status': {'$ne': '4'}}) is None:
                 if users.find_one({'rfid': one_rfid['rfid'], 'status': {'$ne': '4'}}) is None:
                     users.insert_one(one_rfid)
@@ -127,7 +128,15 @@ def add_tables(ch, method, properties, body):
                              {'$set': {'table': list_from_message_tables[1]}})
             print("Запись стола успешно обновлена:")
             print(users.find_one({'order': list_from_message_tables[0]}))
-            refresh_bd_users('orders')
+            for user in users.find({'$and': [{'status': {'$ne': '4'}}, {'rfid': num['number']}]}, projection={'_id': False, 'rfid': False, 'cashbox': False, 'status': False}):
+
+                channel.basic_publish(
+                    exchange='',
+                    routing_key='update_tables',
+                    body=json.dumps(user),
+                    properties=pika.BasicProperties(
+                        delivery_mode=2,
+                    ))
 
 
 def check_robot(ch, method, properties, body):
@@ -135,26 +144,39 @@ def check_robot(ch, method, properties, body):
     print(" [x] Received %r" % body)
     for num in numbers.find({'rfid': str(body.decode("utf-8"))}):
         print(num['number'])
-    if users.find_one({'$and': [{'status': {"$ne": '4'}}, {'rfid': num['number']}]},
-                      projection={'_id': False, 'cashbox': False, 'order': False}) is None:
-        channel.basic_publish(
-            exchange='',
-            routing_key='ROSINFO',
-            body='False',
-            properties=pika.BasicProperties(
+
+    for user in users.find({'$and': [{'status': {"$ne": '4'}}, {'rfid': num['number']}]},
+                      projection={'_id': False, 'cashbox': False}):
+        print(user)
+        if user is None:
+            channel.basic_publish(
+                exchange='',
+                routing_key='ROSINFO',
+                body='False',
+                properties=pika.BasicProperties(
+                    delivery_mode=2,
+                ))
+        else:
+
+            channel.basic_publish(
+                exchange='',
+                routing_key='ROSINFO',
+                body='True',
+                properties=pika.BasicProperties(
                 delivery_mode=2,
-            ))
-    else:
-        channel.basic_publish(
-            exchange='',
-            routing_key='ROSINFO',
-            body='True',
-            properties=pika.BasicProperties(
-                delivery_mode=2,
-            ))
-        users.find_one_and_update({'$and': [{'status': '3'}, {'rfid': num['number']}]},
-                                  {'$set': {'status': '4'}})
-        refresh_bd_users('orders')
+                ))
+            users.find_one_and_update({'$and': [{'status': '3'}, {'rfid': num['number']}]},
+                                    {'$set': {'status': '4'}})
+            for updated_user in users.find({'$and': [{'order': user['order']}, {'rfid': num['number']}]},
+                               projection={'_id': False, 'rfid': False, 'cashbox': False, 'table': False}):
+
+                channel.basic_publish(
+                    exchange='',
+                    routing_key='update_robot',
+                    body=json.dumps(updated_user),
+                    properties=pika.BasicProperties(
+                        delivery_mode=2,
+                    ))
 
 
 def get_nums(ch, method, properties, body):

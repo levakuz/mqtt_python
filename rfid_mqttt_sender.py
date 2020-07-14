@@ -59,7 +59,7 @@ def on_message(client, userdata ,  message):
     print("message retain flag=", message.retain)
 
 
-hostIP = "192.168.1.106"
+hostIP = "192.168.1.71"
 client = mqtt.Client('P1', clean_session=True)
 client.connect(hostIP)
 client.on_message = on_message
