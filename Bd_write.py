@@ -4,8 +4,8 @@ import json
 
 
 def refresh_bd_users(routing_key):
-    for bd in users.find({}, projection={'_id': False, 'cashbox': False, 'rfid': False}):
-        print(bd)
+    for bd in users.find({}, projection={'_id': False}):
+        print(json.dumps(bd))
         channel.basic_publish(
             exchange='',
             routing_key=routing_key,
@@ -72,37 +72,40 @@ def create_rfidsnums(ch, method, properties, body):
     try:
         if one_rfid['key'] == 'EditStatus':
             print(one_rfid['order'])
-            if one_rfid['status'] == '2':
-                print(users.find_one_and_update({'$and': [{'order': one_rfid['order']}, {'status': {'$ne': '4'}}]},
+            if one_rfid['status'] == '2' or one_rfid['status'] == '3':
+                print(users.find_one_and_update({'$and': [{'order': one_rfid['order']}, {'status': {'$ne': '5'}}]},
                                                 {'$set': {'status': one_rfid['status']}}))
-            elif one_rfid['status'] == '3':
-                print(users.find_one_and_update({'$and': [{'order': one_rfid['order']}, {'status': {'$ne': '4'}},
-                                                          {'table': {'$exists': True}}]}, {'$set': {'status': '3'}}))
+            elif one_rfid['status'] == '4':
+                users.update_one({'$and': [{'order': one_rfid['order']}, {'status': {'$ne': '5'}},
+                                                          {'table': {'$exists': True}}]}, {'$set': {'status': '4'}})
                 for user in users.find({'order': one_rfid['order']}, projection={'_id': False}):
                     print(user)
-                channel.basic_publish(
-                    exchange='',
-                    routing_key='ROSINFO',
-                    body=user['table'],
-                    properties=pika.BasicProperties(
-                        delivery_mode=2,
-                    ))
+                try:
+                    channel.basic_publish(
+                            exchange='',
+                            routing_key='ROSINFO',
+                            body=user['table'],
+                            properties=pika.BasicProperties(
+                            delivery_mode=2,
+                            ))
+                except KeyError:
+                    print("Стол не назначен")
 
             refresh_bd_users("orders")
         elif one_rfid['key'] == 'MakeNew':
             del one_rfid['key']
             print(one_rfid)
 
-            if users.find_one({'order': one_rfid['order'], 'status': {'$ne': '4'}}) is None:
-                if users.find_one({'rfid': one_rfid['rfid'], 'status': {'$ne': '4'}}) is None:
-                    users.insert_one(one_rfid)
-                else:
-                    print(error_3)
-                    send_message("cashboxerrors", error_3)
-                refresh_bd_users('orders')
+            if users.find_one({'rfid': one_rfid['rfid'], 'status': {'$ne': '5'}}) is None:
+                users.update_one({'$and': [{'status': {'$ne': '5'}}, {'order': one_rfid['order']}]},
+                                {'$set': {'rfid': one_rfid['rfid']}})
+                print(1)
             else:
-                send_message("cashboxerrors", error_1)
-                print(error_1)
+                print(error_3)
+                send_message("cashboxerrors", error_3)
+
+            refresh_bd_users('orders')
+
     except IndexError:
         print(error_2)
         send_message("cashboxerrors", error_2)
@@ -120,15 +123,15 @@ def add_tables(ch, method, properties, body):
         print(error_1)
         send_message("tableserrors", error_1)
     else:
-        if users.find_one({'$and': [{'status': {'$ne': '4'}}, {'rfid': num['number']}]}) is None:
+        if users.find_one({'$and': [{'status': {'$ne': '5'}}, {'rfid': num['number']}]}) is None:
             print("Ошибка! Нет действующих заказов с такой меткой")
         else:
             print(list_from_message_tables)
-            users.update_one({'$and': [{'status': {'$ne': '4'}}, {'rfid': num['number']}]},
+            users.update_one({'$and': [{'status': {'$ne': '5'}}, {'rfid': num['number']}]},
                              {'$set': {'table': list_from_message_tables[1]}})
             print("Запись стола успешно обновлена:")
             print(users.find_one({'order': list_from_message_tables[0]}))
-            for user in users.find({'$and': [{'status': {'$ne': '4'}}, {'rfid': num['number']}]}, projection={'_id': False, 'rfid': False, 'cashbox': False, 'status': False}):
+            for user in users.find({'$and': [{'status': {'$ne': '5'}}, {'rfid': num['number']}]}, projection={'_id': False, 'rfid': False, 'cashbox': False, 'status': False}):
 
                 channel.basic_publish(
                     exchange='',
@@ -145,7 +148,7 @@ def check_robot(ch, method, properties, body):
     for num in numbers.find({'rfid': str(body.decode("utf-8"))}):
         print(num['number'])
 
-    for user in users.find({'$and': [{'status': {"$ne": '4'}}, {'rfid': num['number']}]},
+    for user in users.find({'$and': [{'status': {"$ne": '5'}}, {'rfid': num['number']}]},
                       projection={'_id': False, 'cashbox': False}):
         print(user)
         if user is None:
@@ -163,10 +166,10 @@ def check_robot(ch, method, properties, body):
                 routing_key='ROSINFO',
                 body='True',
                 properties=pika.BasicProperties(
-                delivery_mode=2,
+                    delivery_mode=2,
                 ))
-            users.find_one_and_update({'$and': [{'status': '3'}, {'rfid': num['number']}]},
-                                    {'$set': {'status': '4'}})
+            users.find_one_and_update({'$and': [{'status': '4'}, {'rfid': num['number']}]},
+                                    {'$set': {'status': '5'}})
             for updated_user in users.find({'$and': [{'order': user['order']}, {'rfid': num['number']}]},
                                projection={'_id': False, 'rfid': False, 'cashbox': False, 'table': False}):
 
@@ -200,6 +203,21 @@ def get_bd_request(ch, method, properties, body):
     refresh_bd_users('orders')
 
 
+def get_parsing_orders(ch, method, properties, body):
+    """Создает новые спарщенные заказы из полученного массива"""
+    for j in json.loads(body):
+        if users.find_one({'order': j['order']}) is None:
+            users.insert_one(j)
+        else:
+            users.find_one_and_update({'$and':[{'order': j['order']}, {'status': {'$lt': '4'}}]}, {'$set': {'status': j['status']}})
+
+    refresh_bd_users('orders')
+
+
+def clear_data(ch, method, properties, body):
+    users.remove()
+
+
 credentials = pika.PlainCredentials('admin', 'admin')
 connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.17',
                                                                5672,
@@ -216,11 +234,11 @@ channel.queue_declare(queue='rfidnums', durable=True)
 channel.queue_declare(queue='GetOrders', durable=True)
 channel.queue_declare(queue='orders', durable=True)
 channel.queue_declare(queue='ROSINFO', durable=False)
+channel.queue_declare(queue='parser_clear_data', durable=False)
 mongo_client = MongoClient('192.168.0.17', 2717)
 db = mongo_client.new_database
 users = db.users
 numbers = db.numbers
-geo_positions = db.geopositions
 channel.basic_consume(
     queue='bdmodule', on_message_callback=create_rfidsnums, auto_ack=True)
 channel.basic_consume(
@@ -231,6 +249,10 @@ channel.basic_consume(
     queue='bdrobots', on_message_callback=check_robot, auto_ack=True)
 channel.basic_consume(
     queue='rfidnums', on_message_callback=get_nums, auto_ack=True)
+channel.basic_consume(
+    queue='parser_data', on_message_callback=get_parsing_orders, auto_ack=True)
+channel.basic_consume(
+    queue='parser_clear_data', on_message_callback=clear_data, auto_ack=True)
 print(' [*] Waiting for messages. To exit press CTRL+C')
 channel.start_consuming()
 
