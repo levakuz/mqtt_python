@@ -219,11 +219,14 @@ def clear_data(ch, method, properties, body):
 
 
 credentials = pika.PlainCredentials('admin', 'admin')
-connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.17',
+connection = pika.BlockingConnection(pika.ConnectionParameters('localhost',
                                                                5672,
                                                                '/',
                                                                credentials))
+
+
 channel = connection.channel()
+
 channel.queue_declare(queue='cashboxerrors', durable=True)
 channel.queue_declare(queue='tableserrors', durable=True)
 channel.queue_declare(queue='bdmodule', durable=True)
@@ -235,10 +238,13 @@ channel.queue_declare(queue='GetOrders', durable=True)
 channel.queue_declare(queue='orders', durable=True)
 channel.queue_declare(queue='ROSINFO', durable=False)
 channel.queue_declare(queue='parser_clear_data', durable=False)
-mongo_client = MongoClient('192.168.0.17', 2717)
+channel.queue_declare(queue='parser_data', durable=False)
+
+mongo_client = MongoClient('localhost', 2717)
 db = mongo_client.new_database
 users = db.users
 numbers = db.numbers
+
 channel.basic_consume(
     queue='bdmodule', on_message_callback=create_rfidsnums, auto_ack=True)
 channel.basic_consume(
