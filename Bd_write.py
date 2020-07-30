@@ -219,7 +219,7 @@ def clear_data(ch, method, properties, body):
 
 
 credentials = pika.PlainCredentials('admin', 'admin')
-connection = pika.BlockingConnection(pika.ConnectionParameters('localhost',
+connection = pika.BlockingConnection(pika.ConnectionParameters('amqp://rabbitmq',
                                                                5672,
                                                                '/',
                                                                credentials))
@@ -240,7 +240,7 @@ channel.queue_declare(queue='ROSINFO', durable=False)
 channel.queue_declare(queue='parser_clear_data', durable=False)
 channel.queue_declare(queue='parser_data', durable=False)
 
-mongo_client = MongoClient('localhost', 2717)
+mongo_client = MongoClient('mongo', 2717)
 db = mongo_client.new_database
 users = db.users
 numbers = db.numbers

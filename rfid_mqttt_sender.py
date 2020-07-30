@@ -3,7 +3,7 @@ import pika
 
 
 credentials = pika.PlainCredentials('admin', 'admin')
-connection = pika.BlockingConnection(pika.ConnectionParameters('localhost',
+connection = pika.BlockingConnection(pika.ConnectionParameters('amqp://rabbitmq',
                                                                5672,
                                                                '/',
                                                                credentials=credentials,
@@ -59,7 +59,7 @@ def on_message(client, userdata ,  message):
     print("message retain flag=", message.retain)
 
 
-hostIP = "localhost"
+hostIP = "rabbitmq"
 client = mqtt.Client('P1', clean_session=True)
 client.connect(hostIP)
 client.on_message = on_message
