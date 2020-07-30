@@ -61,7 +61,7 @@ def on_message(client, userdata ,  message):
 
 hostIP = 'rabbitmq'
 client = mqtt.Client('P1', clean_session=True)
-client.connect(hostIP)
+client.connect(hostIP, 1883)
 client.on_message = on_message
 client.subscribe("rfids/")
 client.subscribe("tables/")
