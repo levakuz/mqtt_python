@@ -3,7 +3,7 @@ import pika
 
 
 credentials = pika.PlainCredentials('admin', 'admin')
-connection = pika.BlockingConnection(pika.ConnectionParameters('amqp://rabbitmq',
+connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq',
                                                                5672,
                                                                '/',
                                                                credentials=credentials,

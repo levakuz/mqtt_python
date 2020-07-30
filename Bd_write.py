@@ -219,7 +219,7 @@ def clear_data(ch, method, properties, body):
 
 
 credentials = pika.PlainCredentials('admin', 'admin')
-connection = pika.BlockingConnection(pika.ConnectionParameters('amqp://rabbitmq',
+connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq',
                                                                5672,
                                                                '/',
                                                                credentials))
