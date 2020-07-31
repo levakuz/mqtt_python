@@ -205,6 +205,8 @@ def get_bd_request(ch, method, properties, body):
 
 def get_parsing_orders(ch, method, properties, body):
     """Создает новые спарщенные заказы из полученного массива"""
+    print(json.loads(body))
+    print(body)
     for j in json.loads(body):
         if users.find_one({'order': j['order']}) is None:
             users.insert_one(j)
@@ -240,7 +242,7 @@ channel.queue_declare(queue='ROSINFO', durable=False)
 channel.queue_declare(queue='parser_clear_data', durable=False)
 channel.queue_declare(queue='parser_data', durable=False)
 
-mongo_client = MongoClient('0.0.0.0', 2717)
+mongo_client = MongoClient('95.181.230.223', 2717)
 db = mongo_client.new_database
 users = db.users
 numbers = db.numbers
