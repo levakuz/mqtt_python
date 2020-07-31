@@ -240,7 +240,7 @@ channel.queue_declare(queue='ROSINFO', durable=False)
 channel.queue_declare(queue='parser_clear_data', durable=False)
 channel.queue_declare(queue='parser_data', durable=False)
 
-mongo_client = MongoClient('localhost', 2717)
+mongo_client = MongoClient('0.0.0.0', 2717)
 db = mongo_client.new_database
 users = db.users
 numbers = db.numbers
