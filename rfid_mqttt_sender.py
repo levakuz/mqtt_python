@@ -3,7 +3,7 @@ import pika
 
 
 credentials = pika.PlainCredentials('admin', 'admin')
-connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.17',
+connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq',
                                                                5672,
                                                                '/',
                                                                credentials=credentials,
@@ -59,9 +59,10 @@ def on_message(client, userdata ,  message):
     print("message retain flag=", message.retain)
 
 
-hostIP = "192.168.1.71"
+hostIP = 'rabbitmq'
 client = mqtt.Client('P1', clean_session=True)
-client.connect(hostIP)
+client.username_pw_set('admin', password='admin')
+client.connect(hostIP, 1883)
 client.on_message = on_message
 client.subscribe("rfids/")
 client.subscribe("tables/")
