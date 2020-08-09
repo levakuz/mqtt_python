@@ -99,7 +99,6 @@ def create_rfidsnums(ch, method, properties, body):
             if users.find_one({'rfid': one_rfid['rfid'], 'status': {'$ne': '5'}}) is None:
                 users.update_one({'$and': [{'status': {'$ne': '5'}}, {'order': one_rfid['order']}]},
                                 {'$set': {'rfid': one_rfid['rfid']}})
-                print(1)
             else:
                 print(error_3)
                 send_message("cashboxerrors", error_3)
@@ -220,6 +219,80 @@ def clear_data(ch, method, properties, body):
     users.remove()
 
 
+def order_data_geopos_gui(ch, method, properties, body):
+    order_list = []
+    print(body)
+    number = json.loads(body)
+    print(number['key'])
+    if number['key'] == "1":
+        """Отправляю данные о всех заказах"""
+        for user in users.find({'status': {'$ne': '5'}},   # Ищу все активные заказы
+                               projection={'_id': False}):
+            order_list.append(user)
+        print(order_list)
+        ch.basic_publish(exchange='',                       # Отправка всех активных заказов в очередь ответа
+                         routing_key=properties.reply_to,
+                         properties=pika.BasicProperties(correlation_id= \
+                                                         properties.correlation_id),
+                         body=json.dumps(order_list))
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    elif number['key'] == "2":
+
+        """Отправляю данные о конкретном заказе"""
+
+        if number['order'] is None:  # Если в запросе нет номера заказа то поиск идет по метке
+
+            for user in users.find({'$and': [{'status': {'$ne': '5'}}, {'rfid': number['rfid']}]},
+                                   projection={'_id': False, 'rfid': False, 'cashbox': False, 'status': False}):
+                order_list.append(user)
+            ch.basic_publish(exchange='',
+                             routing_key=properties.reply_to,
+                             properties=pika.BasicProperties(correlation_id=\
+                                                             properties.correlation_id),
+                             body=json.dumps(order_list))
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+
+        elif number['rfid'] is None:  # Если в запросе нет номера метки то поиск идет по заказу
+            """Отправляю данные о конкретном"""
+            for user in users.find({'$and': [{'status': {'$ne': '5'}}, {'order': number['order']}]},
+                                   projection={'_id': False, 'rfid': False, 'cashbox': False, 'status': False}):
+                order_list.append(user)
+            ch.basic_publish(exchange='',
+                             routing_key=properties.reply_to,
+                             properties=pika.BasicProperties(correlation_id= \
+                                                             properties.correlation_id),
+                             body=json.dumps(order_list))
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+
+        elif number['rfid'] is None and number['order'] is None:
+            print("Не задан ни один критерий поиска")
+
+        else:
+            for user in users.find({'$and': [{'status': {'$ne': '5'}}, {'order': number['order']}, {'rfid': number['rfid']}]},
+                                   projection={'_id': False, 'rfid': False, 'cashbox': False, 'status': False}):
+                order_list.append(user)
+            ch.basic_publish(exchange='',
+                             routing_key=properties.reply_to,
+                             properties=pika.BasicProperties(correlation_id= \
+                                                             properties.correlation_id),
+                             body=json.dumps(order_list))
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+    return
+
+
+def robot_db_response(ch, method, properties, body):
+    robots_list = []
+    robot_info = json.loads(body)
+    for user in db_robots.find({{'id': robot_info['id']}}, projection={'_id': False}):
+        robots_list.append(user)
+    ch.basic_publish(exchange='',
+                     routing_key=properties.reply_to,
+                     properties=pika.BasicProperties(correlation_id= \
+                                                     properties.correlation_id),
+                     body=json.dumps(robots_list))
+
+
 credentials = pika.PlainCredentials('admin', 'admin')
 connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq',
                                                                5672,
@@ -228,7 +301,6 @@ connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq',
 
 
 channel = connection.channel()
-
 channel.queue_declare(queue='cashboxerrors', durable=True)
 channel.queue_declare(queue='tableserrors', durable=True)
 channel.queue_declare(queue='bdmodule', durable=True)
@@ -241,12 +313,14 @@ channel.queue_declare(queue='orders', durable=True)
 channel.queue_declare(queue='ROSINFO', durable=False)
 channel.queue_declare(queue='parser_clear_data', durable=False)
 channel.queue_declare(queue='parser_data', durable=False)
-
-mongo_client = MongoClient('95.181.230.223', 2717)
+channel.queue_declare(queue='rpc_queue', durable=False)
+mongo_client = MongoClient('95.181.230.223', 2717, username='dodo_user', password='8K.b>#Jp49:;jUA+')
 db = mongo_client.new_database
 users = db.users
 numbers = db.numbers
+db_robots = db.robots
 
+channel.basic_consume(on_message_callback=order_data_geopos_gui, queue='rpc_queue')
 channel.basic_consume(
     queue='bdmodule', on_message_callback=create_rfidsnums, auto_ack=True)
 channel.basic_consume(
