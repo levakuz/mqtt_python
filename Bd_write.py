@@ -172,7 +172,8 @@ def get_parsing_orders(ch, method, properties, body):
         if users.find_one({'order': j['order']}) is None:
             users.insert_one(j)
         else:
-            users.find_one_and_update({'$and':[{'order': j['order']}, {'status': {'$lt': '4'}}]}, {'$set': {'status': j['status']}})
+            users.find_one_and_update({'$and': [{'order': j['order']}, {'status': {'$lt': '4'}}]},
+                                      {'$set': {'status': j['status']}})
 
     refresh_bd_users('orders')
 
@@ -225,14 +226,15 @@ def robot_interface_message(ch, method, properties, body):
     print(len(new_robot_data_list))
     for i in range(len(new_robot_data_list)):
         print(new_robot_data_list[i]['id'])
-        users.update_one({'$and': [{'order': new_robot_data_list[i]['id']}, {'robot_id': {'$exists': False}}]},
-                                  {'$set': {'robot_id': new_robot_data_list[i]['robot']}})
+        users.update_one({'$and': [{'order': new_robot_data_list[i]['id']}, {'robot_id': {'$exists': False}},
+                                   {'table': {'$exists': True}}, {'status': '3'}]},
+                         {'$set': {'robot_id': new_robot_data_list[i]['robot']}})
         users.update_one({'$and': [{'order': new_robot_data_list[i]['id']}, {'robot_id': {'$exists': True}}]},
-                                  {'$set': {'status': '4'}})
-        """for user in users.find({'$and': [{'status': {'$ne': '5'}}, {'order': new_robot_data_list[i]['id']}]},
-                               projection={'_id': False, 'rfid': False, 'cashbox': False}):
-            send_message('robot_table_info_1', user['table'])"""
+                         {'$set': {'status': '4'}})
         refresh_bd_users('orders')
+    for user in users.find({'$and': [{'order': new_robot_data_list[i]['id']}, {'robot_id': {'$exists': True}}]}):
+        print(user)
+        send_message('ros_delivery_table', user['table'])
 
 
 def update_robot_status(ch, method, properties, body):
@@ -256,7 +258,7 @@ def robot_db_response_user(ch, method, properties, body):
 
 
 credentials = pika.PlainCredentials('admin', 'admin')
-connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.17',
+connection = pika.BlockingConnection(pika.ConnectionParameters('95.181.230.223',
                                                                5672,
                                                                '/',
                                                                credentials))
@@ -278,6 +280,7 @@ channel.queue_declare(queue='set_selected_orders', durable=False)
 channel.queue_declare(queue='set_robot_status', durable=False)
 channel.queue_declare(queue='get_robots', durable=False)
 channel.queue_declare(queue='rpc_find_order_for_interface', durable=False)
+channel.queue_declare(queue='ros_delivery_table', durable=False)
 
 mongo_client = MongoClient('95.181.230.223', 2717, username='dodo_user', password='8K.b>#Jp49:;jUA+')
 db = mongo_client.new_database
@@ -290,23 +293,12 @@ channel.basic_consume(on_message_callback=order_data_geopos_gui, queue='rpc_find
 channel.basic_consume(on_message_callback=robot_db_response_user, queue='rpc_robots_db')
 channel.basic_consume(on_message_callback=robot_interface_message, queue='set_selected_orders', auto_ack=True)
 channel.basic_consume(on_message_callback=update_robot_status, queue='set_robot_status', auto_ack=True)
-channel.basic_consume(
-    queue='bdmodule', on_message_callback=create_rfidsnums, auto_ack=True)
-channel.basic_consume(
-    queue='bdtables', on_message_callback=add_tables, auto_ack=True)
-channel.basic_consume(
-    queue='GetOrders', on_message_callback=get_bd_request, auto_ack=True)
-channel.basic_consume(
-    queue='bdrobots', on_message_callback=check_robot, auto_ack=True)
-channel.basic_consume(
-    queue='rfidnums', on_message_callback=get_nums, auto_ack=True)
-channel.basic_consume(
-    queue='parser_data', on_message_callback=get_parsing_orders, auto_ack=True)
-channel.basic_consume(
-    queue='parser_clear_data', on_message_callback=clear_data, auto_ack=True)
+channel.basic_consume(queue='bdmodule', on_message_callback=create_rfidsnums, auto_ack=True)
+channel.basic_consume(queue='bdtables', on_message_callback=add_tables, auto_ack=True)
+channel.basic_consume(queue='GetOrders', on_message_callback=get_bd_request, auto_ack=True)
+channel.basic_consume(queue='bdrobots', on_message_callback=check_robot, auto_ack=True)
+channel.basic_consume(queue='rfidnums', on_message_callback=get_nums, auto_ack=True)
+channel.basic_consume(queue='parser_data', on_message_callback=get_parsing_orders, auto_ack=True)
+channel.basic_consume(queue='parser_clear_data', on_message_callback=clear_data, auto_ack=True)
 print(' [*] Waiting for messages. To exit press CTRL+C')
 channel.start_consuming()
-
-
-
-
