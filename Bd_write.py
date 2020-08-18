@@ -258,7 +258,7 @@ def robot_db_response_user(ch, method, properties, body):
 
 
 credentials = pika.PlainCredentials('admin', 'admin')
-connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.17',
+connection = pika.BlockingConnection(pika.ConnectionParameters('95.181.230.223',
                                                                5672,
                                                                '/',
                                                                credentials))
