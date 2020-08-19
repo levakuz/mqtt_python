@@ -288,9 +288,15 @@ users = db.users
 numbers = db.numbers
 db_robots = db.robots
 
+<<<<<<< HEAD
 channel.basic_consume(on_message_callback=robot_db_response, queue='get_robots', auto_ack=True)
 channel.basic_consume(on_message_callback=order_data_geopos_gui, queue='rpc_find_order_for_interface', auto_ack=True)
 channel.basic_consume(on_message_callback=robot_db_response_user, queue='rpc_robots_db', auto_ack=True)
+=======
+channel.basic_consume(on_message_callback=robot_db_response, queue='get_robots')
+channel.basic_consume(on_message_callback=order_data_geopos_gui, queue='rpc_find_order_for_interface')
+channel.basic_consume(on_message_callback=robot_db_response_user, queue='rpc_robots_db')
+>>>>>>> f32cdf45a28106aab6761b842fa1264b7102ba7b
 channel.basic_consume(on_message_callback=robot_interface_message, queue='set_selected_orders', auto_ack=True)
 channel.basic_consume(on_message_callback=update_robot_status, queue='set_robot_status', auto_ack=True)
 channel.basic_consume(queue='bdmodule', on_message_callback=create_rfidsnums, auto_ack=True)
