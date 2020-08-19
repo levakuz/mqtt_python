@@ -258,7 +258,7 @@ def robot_db_response_user(ch, method, properties, body):
 
 
 credentials = pika.PlainCredentials('admin', 'admin')
-connection = pika.BlockingConnection(pika.ConnectionParameters('95.181.230.223',
+connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.17',
                                                                5672,
                                                                '/',
                                                                credentials))
@@ -282,7 +282,7 @@ channel.queue_declare(queue='get_robots', durable=False)
 channel.queue_declare(queue='rpc_find_order_for_interface', durable=False)
 channel.queue_declare(queue='ros_delivery_table', durable=False)
 
-mongo_client = MongoClient('95.181.230.223', 2717, username='dodo_user', password='8K.b>#Jp49:;jUA+')
+mongo_client = MongoClient('192.168.0.17', 2717)
 db = mongo_client.new_database
 users = db.users
 numbers = db.numbers
