@@ -72,6 +72,7 @@ def prepare_list(body):
 def create_rfidsnums(ch, method, properties, body):
     """Принимает значение RFID uid из RabbitMQ и записывает в БД"""
     print(" [x] Received %r" % body)
+    print('parser')
     error_2 = "Не получен ключ операции"
     error_1 = "Заказ с таким номером уже существует!"
     error_3 = "Заказ с такой меткой существует!"
@@ -125,9 +126,9 @@ def add_tables(ch, method, properties, body):
                              {'$set': {'table': list_from_message_tables[1]}})
             print("Запись стола успешно обновлена:")
             print(users.find_one({'order': list_from_message_tables[0]}))
-            for user in users.find({'$and': [{'status': {'$ne': '5'}}, {'rfid': num['number']}]},
-                                   projection={'_id': False, 'rfid': False, 'cashbox': False, 'status': False}):
-                send_message('update_tables', json.dumps(user))
+
+
+            refresh_bd_users('orders')
 
 
 def check_robot(ch, method, properties, body):
@@ -136,17 +137,26 @@ def check_robot(ch, method, properties, body):
     for num in numbers.find({'rfid': str(body.decode("utf-8"))}):
         print(num['number'])
 
-    for user in users.find({'$and': [{'status': '4'}, {'rfid': num['number']}, {'robot_id': num['robot_id']}]},
+    for user in users.find({'$and': [{'status': '4'}, {'rfid': num['number']}]},
                            projection={'_id': False, 'cashbox': False}):
         print(user)
         if user is None:
-            send_message('ROSINFO', 'False')
+            channel.basic_publish(
+                exchange='',
+                routing_key="ROSINFO",
+                body='False',
+                properties=pika.BasicProperties(
+                    delivery_mode=2,
+                ))
         else:
-            send_message('ROSINFO', 'True')
-            users.find_one_and_update({'$and': [{'status': '4'}, {'rfid': num['number']}, {'robot_id': num['robot_id']}]}, {'$set': {'status': '5'}})
-            for updated_user in users.find({'$and': [{'order': user['order']}, {'rfid': num['number']}]},
-                                           projection={'_id': False, 'rfid': False, 'cashbox': False, 'table': False}):
-                send_message('update_robot', json.dumps(updated_user))
+            channel.basic_publish(
+                exchange='',
+                routing_key="ROSINFO",
+                body='True',
+                properties=pika.BasicProperties(
+                    delivery_mode=2,
+                ))
+            users.update_one({'$and': [{'status': '4'}, {'rfid': num['number']}]}, {'$set': {'status': '5'}})
 
 
 def get_nums(ch, method, properties, body):
@@ -168,6 +178,8 @@ def get_parsing_orders(ch, method, properties, body):
     """Создает новые спарщенные заказы из полученного массива"""
     print(json.loads(body))
     print(body)
+    print('Im here')
+
     for j in json.loads(body):
         if users.find_one({'order': j['order']}) is None:
             users.insert_one(j)
@@ -221,6 +233,7 @@ def robot_db_response(ch, method, properties, body):
 
 def robot_interface_message(ch, method, properties, body):
     print(body)
+    print('robot interface')
     new_robot_data_list = json.loads(body)
     print(new_robot_data_list)
     print(len(new_robot_data_list))
@@ -233,12 +246,20 @@ def robot_interface_message(ch, method, properties, body):
                          {'$set': {'status': '4'}})
         refresh_bd_users('orders')
     for user in users.find({'$and': [{'order': new_robot_data_list[i]['id']}, {'robot_id': {'$exists': True}}]}):
-        print(user)
-        send_message('ros_delivery_table', user['table'])
+        print(user['table'])
+        channel.basic_publish(
+            exchange='',
+            routing_key="ROSINFO",
+            body=user['table'],
+            properties=pika.BasicProperties(
+                delivery_mode=2,
+            ))
+
 
 
 def update_robot_status(ch, method, properties, body):
     print(body)
+    print('update robot')
     new_robot_data = json.loads(body)
     print(new_robot_data)
     db_robots.find_one_and_update({'robot_id': new_robot_data}, {'$set': {'is_active': 1}})
