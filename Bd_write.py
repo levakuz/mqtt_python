@@ -178,11 +178,15 @@ def get_parsing_orders(ch, method, properties, body):
     """Создает новые спарщенные заказы из полученного массива"""
     print(json.loads(body))
     print(body)
-    print('Im here')
+
 
     for j in json.loads(body):
-        if users.find_one({'order': j['order']}) is None:
+        if users.find_one({'order': j['order']}, projection={'_id': False}) is None:
             users.insert_one(j)
+            j.pop('_id')
+            print(j)
+            send_message('add_order_interface', j)
+
         else:
             users.find_one_and_update({'$and': [{'order': j['order']}, {'status': {'$lt': '4'}}]},
                                       {'$set': {'status': j['status']}})
@@ -197,6 +201,7 @@ def clear_data(ch, method, properties, body):
 def order_data_geopos_gui(ch, method, properties, body):
     order_list = []
     print(body)
+    print("order data geopos")
     number = json.loads(body)
     print(number['key'])
     if str(number['key']) == "1":
@@ -210,7 +215,6 @@ def order_data_geopos_gui(ch, method, properties, body):
                          properties=pika.BasicProperties(correlation_id= \
                                                          properties.correlation_id),
                          body=json.dumps(order_list))
-        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     elif str(number['key']) == "2":
 
@@ -224,7 +228,6 @@ def order_data_geopos_gui(ch, method, properties, body):
                          properties=pika.BasicProperties(correlation_id=\
                                                                  properties.correlation_id),
                          body=json.dumps(order_list))
-        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
 def robot_db_response(ch, method, properties, body):
@@ -254,7 +257,6 @@ def robot_interface_message(ch, method, properties, body):
             properties=pika.BasicProperties(
                 delivery_mode=2,
             ))
-
 
 
 def update_robot_status(ch, method, properties, body):
@@ -302,6 +304,7 @@ channel.queue_declare(queue='set_robot_status', durable=False)
 channel.queue_declare(queue='get_robots', durable=False)
 channel.queue_declare(queue='rpc_find_order_for_interface', durable=False)
 channel.queue_declare(queue='ros_delivery_table', durable=False)
+channel.queue_declare(queue='add_order_interface', durable=False)
 
 mongo_client = MongoClient('95.181.230.223', 2717, username='dodo_user', password='8K.b>#Jp49:;jUA+')
 db = mongo_client.new_database
