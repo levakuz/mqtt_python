@@ -88,6 +88,7 @@ def create_rfidsnums(ch, method, properties, body):
                 users.update_one({'$and': [{'order': one_rfid['order']}, {'status': {'$ne': '5'}},
                                                           {'table': {'$exists': True}}]}, {'$set': {'status': '4'}})
             refresh_bd_users("orders")
+            refresh_bd_users("orders1")
         elif one_rfid['key'] == 'MakeNew':
             del one_rfid['key']
             print(one_rfid)
@@ -100,6 +101,7 @@ def create_rfidsnums(ch, method, properties, body):
                 send_message("cashboxerrors", error_3)
 
             refresh_bd_users('orders')
+            refresh_bd_users("orders1")
 
     except IndexError:
         print(error_2)
@@ -129,6 +131,7 @@ def add_tables(ch, method, properties, body):
 
 
             refresh_bd_users('orders')
+            refresh_bd_users("orders1")
 
 
 def check_robot(ch, method, properties, body):
@@ -172,6 +175,7 @@ def get_bd_request(ch, method, properties, body):
     """Прием запроса на отправку БД"""
     print(" [x] Received %r" % body)
     refresh_bd_users('orders')
+    refresh_bd_users("orders1")
 
 
 def get_parsing_orders(ch, method, properties, body):
@@ -192,6 +196,7 @@ def get_parsing_orders(ch, method, properties, body):
                                       {'$set': {'status': j['status']}})
 
     refresh_bd_users('orders')
+    refresh_bd_users("orders1")
 
 
 def clear_data(ch, method, properties, body):
@@ -248,6 +253,7 @@ def robot_interface_message(ch, method, properties, body):
         users.update_one({'$and': [{'order': new_robot_data_list[i]['id']}, {'robot_id': {'$exists': True}}]},
                          {'$set': {'status': '4'}})
         refresh_bd_users('orders')
+        refresh_bd_users("orders1")
     for user in users.find({'$and': [{'order': new_robot_data_list[i]['id']}, {'robot_id': {'$exists': True}}]}):
         print(user['table'])
         channel.basic_publish(
@@ -295,6 +301,7 @@ channel.queue_declare(queue='robots', durable=True)
 channel.queue_declare(queue='rfidnums', durable=True)
 channel.queue_declare(queue='GetOrders', durable=True)
 channel.queue_declare(queue='orders', durable=True)
+channel.queue_declare(queue='orders1', durable=False)
 channel.queue_declare(queue='ROSINFO', durable=False)
 channel.queue_declare(queue='parser_clear_data', durable=False)
 channel.queue_declare(queue='parser_data', durable=False)
@@ -313,11 +320,11 @@ numbers = db.numbers
 db_robots = db.robots
 
 
-channel.basic_consume(on_message_callback=robot_db_response, queue='get_robots', auto_ack=True)
-channel.basic_consume(on_message_callback=order_data_geopos_gui, queue='rpc_find_order_for_interface', auto_ack=True)
-channel.basic_consume(on_message_callback=robot_db_response_user, queue='rpc_robots_db', auto_ack=True)
-channel.basic_consume(on_message_callback=robot_interface_message, queue='set_selected_orders', auto_ack=True)
-channel.basic_consume(on_message_callback=update_robot_status, queue='set_robot_status', auto_ack=True)
+channel.basic_consume(queue='get_robots', on_message_callback=robot_db_response, auto_ack=True)
+channel.basic_consume(queue='rpc_find_order_for_interface', on_message_callback=order_data_geopos_gui, auto_ack=True)
+channel.basic_consume(queue='rpc_robots_db', on_message_callback=robot_db_response_user, auto_ack=True)
+channel.basic_consume(queue='set_selected_orders', on_message_callback=robot_interface_message, auto_ack=True)
+channel.basic_consume(queue='set_robot_status', on_message_callback=update_robot_status, auto_ack=True)
 channel.basic_consume(queue='bdmodule', on_message_callback=create_rfidsnums, auto_ack=True)
 channel.basic_consume(queue='bdtables', on_message_callback=add_tables, auto_ack=True)
 channel.basic_consume(queue='GetOrders', on_message_callback=get_bd_request, auto_ack=True)
