@@ -146,7 +146,7 @@ def check_robot(ch, method, properties, body):
         if user is None:
             channel.basic_publish(
                 exchange='',
-                routing_key="ROSINFO",
+                routing_key="robot_delivery_order",
                 body='False',
                 properties=pika.BasicProperties(
                     delivery_mode=2,
@@ -154,7 +154,7 @@ def check_robot(ch, method, properties, body):
         else:
             channel.basic_publish(
                 exchange='',
-                routing_key="ROSINFO",
+                routing_key="robot_delivery_order",
                 body='True',
                 properties=pika.BasicProperties(
                     delivery_mode=2,
@@ -258,7 +258,7 @@ def robot_interface_message(ch, method, properties, body):
         print(user['table'])
         channel.basic_publish(
             exchange='',
-            routing_key="ROSINFO",
+            routing_key="robot_delivery_order",
             body=user['table'],
             properties=pika.BasicProperties(
                 delivery_mode=2,
@@ -302,7 +302,7 @@ channel.queue_declare(queue='rfidnums', durable=True)
 channel.queue_declare(queue='GetOrders', durable=True)
 channel.queue_declare(queue='orders', durable=True)
 channel.queue_declare(queue='orders1', durable=False)
-channel.queue_declare(queue='ROSINFO', durable=False)
+channel.queue_declare(queue='robot_delivery_order', durable=False)
 channel.queue_declare(queue='parser_clear_data', durable=False)
 channel.queue_declare(queue='parser_data', durable=False)
 channel.queue_declare(queue='rpc_robots_db', durable=False)
@@ -310,7 +310,6 @@ channel.queue_declare(queue='set_selected_orders', durable=False)
 channel.queue_declare(queue='set_robot_status', durable=False)
 channel.queue_declare(queue='get_robots', durable=False)
 channel.queue_declare(queue='rpc_find_order_for_interface', durable=False)
-channel.queue_declare(queue='ros_delivery_table', durable=False)
 channel.queue_declare(queue='add_order_interface', durable=False)
 
 mongo_client = MongoClient('95.181.230.223', 2717, username='dodo_user', password='8K.b>#Jp49:;jUA+')
