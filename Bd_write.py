@@ -200,17 +200,19 @@ def get_parsing_orders(ch, method, properties, body):
 
 
 def clear_data(ch, method, properties, body):
+    """При получении сообщения производится очистка базы данных"""
     users.remove()
 
 
 def order_data_geopos_gui(ch, method, properties, body):
+    """Отправляет базу данных заказов в интерфейс пользователя"""
     order_list = []
     print(body)
     print("order data geopos")
     number = json.loads(body)
     print(number['key'])
     if str(number['key']) == "1":
-        """Отправляю данные о всех заказах"""
+        """Отправка данных о всех заказах"""
         for user in users.find({'status': {'$ne': '5'}},   # Ищу все активные заказы
                                projection={'_id': False}):
             order_list.append(user)
@@ -222,8 +224,7 @@ def order_data_geopos_gui(ch, method, properties, body):
                          body=json.dumps(order_list))
 
     elif str(number['key']) == "2":
-
-        """Отправляю данные о конкретном заказе"""
+        """Отправка данных о конкретном заказе"""
         print(number['order'])
         for user in users.find({'$and': [{'status': {'$ne': '5'}}, {'order': number['order']}]},
                                projection={'_id': False, 'cashbox': False}):
@@ -236,10 +237,12 @@ def order_data_geopos_gui(ch, method, properties, body):
 
 
 def robot_db_response(ch, method, properties, body):
+    """Производит обновление базы данных роботов"""
     update_robots('robots')
 
 
 def robot_interface_message(ch, method, properties, body):
+    """Принимает сообщение из интерфейса робота и отправляет соответсвующее сообщение в ROS"""
     print(body)
     print('robot interface')
     new_robot_data_list = json.loads(body)
@@ -266,6 +269,7 @@ def robot_interface_message(ch, method, properties, body):
 
 
 def update_robot_status(ch, method, properties, body):
+    """Принимает сообщение с id робота и устаналивает ему статус активного"""
     print(body)
     print('update robot')
     new_robot_data = json.loads(body)
@@ -275,6 +279,7 @@ def update_robot_status(ch, method, properties, body):
 
 
 def robot_db_response_user(ch, method, properties, body):
+    """Отправляет базу данных роботов в интерфейс пользователя"""
     robots_list = []
     robot_info = json.loads(body)
     for user in db_robots.find({}, projection={'_id': False}):
@@ -292,6 +297,8 @@ connection = pika.BlockingConnection(pika.ConnectionParameters('95.181.230.223',
                                                                '/',
                                                                credentials))
 channel = connection.channel()
+
+"""///////////////////////////////////////////Блок объявления очередей///////////////////////////////////////////////"""
 channel.queue_declare(queue='cashboxerrors', durable=True)
 channel.queue_declare(queue='tableserrors', durable=True)
 channel.queue_declare(queue='bdmodule', durable=True)
@@ -311,6 +318,7 @@ channel.queue_declare(queue='set_robot_status', durable=False)
 channel.queue_declare(queue='get_robots', durable=False)
 channel.queue_declare(queue='rpc_find_order_for_interface', durable=False)
 channel.queue_declare(queue='add_order_interface', durable=False)
+"""///////////////////////////////////////////Конец блока объявления очередей////////////////////////////////////////"""
 
 mongo_client = MongoClient('95.181.230.223', 2717, username='dodo_user', password='8K.b>#Jp49:;jUA+')
 db = mongo_client.new_database
@@ -331,5 +339,6 @@ channel.basic_consume(queue='bdrobots', on_message_callback=check_robot, auto_ac
 channel.basic_consume(queue='rfidnums', on_message_callback=get_nums, auto_ack=True)
 channel.basic_consume(queue='parser_data', on_message_callback=get_parsing_orders, auto_ack=True)
 channel.basic_consume(queue='parser_clear_data', on_message_callback=clear_data, auto_ack=True)
+
 print(' [*] Waiting for messages. To exit press CTRL+C')
 channel.start_consuming()
