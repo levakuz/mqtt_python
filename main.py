@@ -35,19 +35,9 @@ def get_map(ch, method, properties, body):
                 map[i][j] = 255
     print(map)
 
-    """
-    for i in range(0, int(rows)):
-        print(i)
-        for j in range(0, int(cols)):
-
-            if map[i][j] == 1:
-                plt.scatter(i, j, c='black')
-    plt.show()"""
-
     im = Image.fromarray(map)
     im = im.convert('1')
     im = im.transpose(Image.FLIP_TOP_BOTTOM)
-    im.show()
     im.save('123.png')
     files = {
         'map': open('123.png', 'rb')
