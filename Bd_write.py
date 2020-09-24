@@ -183,7 +183,6 @@ def get_parsing_orders(ch, method, properties, body):
     print(json.loads(body))
     print(body)
 
-
     for j in json.loads(body):
         if users.find_one({'order': j['order']}, projection={'_id': False}) is None:
             users.insert_one(j)

@@ -27,22 +27,27 @@ def get_map(ch, method, properties, body):
     map = np.zeros((int(rows), int(cols)))
     for i in range(0, int(rows)):
         map[i] = new_message[str(i)]
+
     for i in range(0, int(rows)):
         for j in range(0, int(cols)):
-            if map[i][j] == True:
+            if map[i][j] == 100:
                 map[i][j] = 0
-            else:
-                map[i][j] = 255
-    print(map)
+            elif map[i][j] == -1:
+                map[i][j] = 100
+            else :
+                map[i][j] = 50
 
+
+    print(map)
     im = Image.fromarray(map)
-    im = im.convert('1')
+    im = im.convert('L')
     im = im.transpose(Image.FLIP_TOP_BOTTOM)
     im.save('123.png')
+    im.show()
     files = {
         'map': open('123.png', 'rb')
     }
-    foo = post('http://95.181.230.223:15032/robot_map', files=files)
+    foo = post('http://95.181.230.223:15032/mapImage', files=files)
 
 
 channel.basic_consume(on_message_callback=get_map, queue='robot_map', auto_ack=True)
