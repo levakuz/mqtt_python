@@ -37,13 +37,11 @@ def get_map(ch, method, properties, body):
             else :
                 map[i][j] = 50
 
-
     print(map)
     im = Image.fromarray(map)
     im = im.convert('L')
     im = im.transpose(Image.FLIP_TOP_BOTTOM)
     im.save('123.png')
-    im.show()
     files = {
         'map': open('123.png', 'rb')
     }
